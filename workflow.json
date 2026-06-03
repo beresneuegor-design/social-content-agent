@@ -1,0 +1,75 @@
+{
+  "name": "Social Content Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": { "interval": [{ "triggerAtHour": 9 }] }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "id": "d4e5f6a7-0004-0004-0004-000000000001",
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "YOUR_GOOGLE_SHEET_ID" },
+        "sheetName": { "__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Content Calendar" },
+        "filters": { "conditions": [{ "leftValue": "Status", "rightValue": "pending" }] },
+        "options": { "returnFirstMatch": true }
+      },
+      "name": "Get Next Topic",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [480, 300],
+      "id": "d4e5f6a7-0004-0004-0004-000000000002",
+      "typeVersion": 4.7,
+      "credentials": {
+        "googleSheetsOAuth2Api": { "id": "YOUR_GOOGLE_CREDENTIAL_ID", "name": "Google Sheets OAuth2 API" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [{ "name": "Authorization", "value": "=Bearer YOUR_GROQ_API_KEY" }]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "=application/json",
+        "body": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\"role\": \"system\", \"content\": \"You are a social media copywriter. Write an engaging post for {{ $json.Platform }}. Tone: {{ $json.Tone }}. Include relevant emojis, 3-5 hashtags, and a strong CTA. Max 300 words. Reply with ONLY the post text.\"},\n    {\"role\": \"user\", \"content\": \"Topic: {{ $json.Topic }}\"}\n  ]\n}",
+        "options": {}
+      },
+      "name": "Groq AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [720, 300],
+      "id": "d4e5f6a7-0004-0004-0004-000000000003",
+      "typeVersion": 4.4
+    },
+    {
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=✍️ New Post Draft — {{ $('Get Next Topic').first().json.Platform }}\n\nTopic: {{ $('Get Next Topic').first().json.Topic }}\n\n---\n{{ $json.choices[0].message.content }}\n---\n\nReply:\n✅ — publish\n❌ — skip",
+        "additionalFields": {}
+      },
+      "name": "Send for Approval",
+      "type": "n8n-nodes-base.telegram",
+      "position": [960, 300],
+      "id": "d4e5f6a7-0004-0004-0004-000000000004",
+      "typeVersion": 1.2,
+      "credentials": {
+        "telegramApi": { "id": "YOUR_TELEGRAM_CREDENTIAL_ID", "name": "Telegram account" }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": { "main": [[{ "node": "Get Next Topic", "type": "main", "index": 0 }]] },
+    "Get Next Topic": { "main": [[{ "node": "Groq AI", "type": "main", "index": 0 }]] },
+    "Groq AI": { "main": [[{ "node": "Send for Approval", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": []
+}
